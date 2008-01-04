@@ -64,7 +64,7 @@ Yusuke Kawasaki, http://www.kawa.net/
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (c) 2006 Yusuke Kawasaki. All rights reserved.
+Copyright (c) 2006-2008 Yusuke Kawasaki. All rights reserved.
 This program is free software; you can redistribute it 
 and/or modify it under the same terms as Perl itself.
 
@@ -76,11 +76,12 @@ use vars qw( @ISA );
 @ISA = qw( XML::FeedPP::Plugin );
 use Carp;
 use Symbol;
-# use JSON;
+require 5.008;
+# use JSON::PP;
 # use JSON::Syck;
 
 use vars qw( $VERSION );
-$VERSION = "0.15";
+$VERSION = "0.33";
 
 *XML::FeedPP::to_json = \&to_json;
 
@@ -122,16 +123,44 @@ sub write_file {
 
 sub dump_json {
     my $data = shift;
-    my $opt = { convblessed => 1 };
-    return JSON::Syck::Dump($data) if defined $JSON::Syck::VERSION;
-    return JSON->new()->objToJson($data,$opt) if defined $JSON::VERSION;
+    return &dump_json_syck($data) if defined $JSON::Syck::VERSION;
+    return &dump_json_pp($data) if defined $JSON::VERSION;
     local $@;
     eval { require JSON::Syck; };
-    return JSON::Syck::Dump($data) if defined $JSON::Syck::VERSION;
+    return &dump_json_syck($data) if defined $JSON::Syck::VERSION;
     eval { require JSON; };
-    return JSON->new()->objToJson($data,$opt) if defined $JSON::VERSION;
-    undef;
+    return &dump_json_pp($data) if defined $JSON::VERSION;
+    Carp::croak "JSON:PP or JSON::Syck is required";
 }
+
+sub dump_json_syck {
+    my $data = shift;
+#   warn "[JSON::Syck $JSON::Syck::VERSION]\n";
+	local $JSON::Syck::ImplicitUnicode = $XML::FeedPP::UTF8_FLAG;
+    JSON::Syck::Dump($data);
+}
+
+sub dump_json_pp {
+    my $data = shift;
+    my $ver = ( $JSON::VERSION =~ /^([\d\.]+)/ )[0];
+    Carp::croak "JSON::PP version 2.0 or above is required" if ( $ver < 1.99 );
+    if ( ! defined $JSON::PP::VERSION ) {
+        local $@;
+        eval { require JSON::PP; };
+        Carp::croak "JSON::PP is required" if $@;
+    }
+    my $json = JSON::PP->new();
+    $json->utf8(! $XML::FeedPP::UTF8_FLAG);
+    $json->allow_nonref();
+    $json->allow_blessed(1);
+    $json->as_nonblessed(1);
+    return $json->encode($data);
+}
+
+# sub dump_json_pp_old {
+#     my $opt = { convblessed => 1 };
+#     return JSON->new()->objToJson($data,$opt)
+# }
 
 sub slim_feed {
     my $feed = shift;

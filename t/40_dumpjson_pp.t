@@ -50,10 +50,17 @@ sub test_main {
         like( $json, qr/\Q$link1\E/, 'item link 1' );
         like( $json, qr/\Q$link2\E/, 'item link 2' );
 
-        my $data = JSON->new()->jsonToObj($json);
+        my $data = __decode_json($json);
         ok( ref $data->{$root}, "$root root element" );
         ok( $data->{$root}->{'-xmlns'} || $data->{$root}->{'-version'}, "$root xmlns or version" );
     }
+}
+# ----------------------------------------------------------------
+sub __decode_json {
+    my $json = shift;
+    my $jver = ( $JSON::VERSION =~ /^([\d\.]+)/ )[0];
+    return JSON->new()->jsonToObj($json) if ( $jver < 1.99 );
+    JSON->new()->decode($json);
 }
 # ----------------------------------------------------------------
 ;1;

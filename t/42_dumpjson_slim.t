@@ -44,7 +44,7 @@ sub test_slim {
 
     my $rssfeed = &init_feed( XML::FeedPP::RSS->new() );
     my $rssjson = $rssfeed->call( DumpJSON => '', %$opt );
-    my $rssslim = JSON->new()->jsonToObj($rssjson);
+    my $rssslim = __decode_json($rssjson);
     is( $rssslim->{rss}->{channel}->{link},    $flink,    'rss channel link' );
     is( $rssslim->{rss}->{channel}->{title},   $ftitle,   'rss channel title' );
     is( $rssslim->{rss}->{channel}->{pubDate}, $date110h, 'rss channel pubDate' );
@@ -57,7 +57,7 @@ sub test_slim {
 
     my $rdffeed = &init_feed( XML::FeedPP::RDF->new() );
     my $rdfjson = $rdffeed->call( DumpJSON => '', %$opt );
-    my $rdfslim = JSON->new()->jsonToObj($rdfjson);
+    my $rdfslim = __decode_json($rdfjson);
     is( $rdfslim->{'rdf:RDF'}->{channel}->{link},      $flink,    'rdf channel link' );
     is( $rdfslim->{'rdf:RDF'}->{channel}->{title},     $ftitle,   'rdf channel title' );
     is( $rdfslim->{'rdf:RDF'}->{channel}->{'dc:date'}, $date110w, 'rdf channel dc:date' );
@@ -70,7 +70,7 @@ sub test_slim {
 
     my $atomfeed = &init_feed( XML::FeedPP::Atom->new() );
     my $atomjson = $atomfeed->call( DumpJSON => '', %$opt );
-    my $atomslim = JSON->new()->jsonToObj($atomjson);
+    my $atomslim = __decode_json($atomjson);
     is( $atomslim->{feed}->{link},     $flink,    'atom channel link' );
     is( $atomslim->{feed}->{title},    $ftitle,   'atom channel title' );
     is( $atomslim->{feed}->{modified}, $date110w, 'atom channel modified' );
@@ -105,7 +105,7 @@ sub test_more_slim {
 
     my $rssfeed = &init_feed( XML::FeedPP::RSS->new() );
     my $rssjson = $rssfeed->call( DumpJSON => '', %$opt );
-    my $rssslim = JSON->new()->jsonToObj($rssjson);
+    my $rssslim = __decode_json($rssjson);
     is( $rssslim->{rss}->{channel}->{link},              $flink, 'rss channel link' );
     is( $rssslim->{rss}->{channel}->{item}->[0]->{link}, $link1, 'rss item0 link' );
     is( $rssslim->{rss}->{channel}->{item}->[1]->{link}, $link2, 'rss item1 link' );
@@ -115,7 +115,7 @@ sub test_more_slim {
 
     my $rdffeed = &init_feed( XML::FeedPP::RDF->new() );
     my $rdfjson = $rdffeed->call( DumpJSON => '', %$opt );
-    my $rdfslim = JSON->new()->jsonToObj($rdfjson);
+    my $rdfslim = __decode_json($rdfjson);
     is( $rdfslim->{'rdf:RDF'}->{channel}->{link},   $flink, 'rdf channel link' );
     is( $rdfslim->{'rdf:RDF'}->{item}->[0]->{link}, $link1, 'rdf item0 link' );
     is( $rdfslim->{'rdf:RDF'}->{item}->[1]->{link}, $link2, 'rdf item1 link' );
@@ -125,13 +125,20 @@ sub test_more_slim {
 
     my $atomfeed = &init_feed( XML::FeedPP::Atom->new() );
     my $atomjson = $atomfeed->call( DumpJSON => '', %$opt );
-    my $atomslim = JSON->new()->jsonToObj($atomjson);
+    my $atomslim = __decode_json($atomjson);
     is( $atomslim->{feed}->{link},               $flink, 'atom channel link' );
     is( $atomslim->{feed}->{entry}->[0]->{link}, $link1, 'atom item0 link' );
     is( $atomslim->{feed}->{entry}->[1]->{link}, $link2, 'atom item1 link' );
     ok( ! exists $atomslim->{feed}->{title},               'atom channel title' );
     ok( ! exists $atomslim->{feed}->{entry}->[0]->{title}, 'atom item0 title' );
     ok( ! exists $atomslim->{feed}->{entry}->[1]->{title}, 'atom item1 title' );
+}
+# ----------------------------------------------------------------
+sub __decode_json {
+    my $json = shift;
+    my $jver = ( $JSON::VERSION =~ /^([\d\.]+)/ )[0];
+    return JSON->new()->jsonToObj($json) if ( $jver < 1.99 );
+    JSON->new()->decode($json);
 }
 # ----------------------------------------------------------------
 sub init_feed {
