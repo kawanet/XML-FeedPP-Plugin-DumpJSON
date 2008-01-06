@@ -19,7 +19,7 @@ If a JSON filename is C<undef> or C<''>, this module returns a JSON
 string instead of generating a JSON file.
 
     $feed->call( DumpJSON => 'feed.json' );     # generates a JSON file
-    my $json = $feed->call( DumpJSON => '' );   # returns a JSON string
+    my $json = $feed->call( 'DumpJSON' );       # returns a JSON string
 
 =head1 OPTIONS
 
@@ -30,7 +30,7 @@ This plugin allows some optoinal arguments following:
         slim_element_add => [ 'media:thumbnail@url' ],
         slim_element     => [ 'link', 'title', 'pubDate' ],
     );
-    my $json = $feed->call( DumpJSON => '', %opt );
+    my $json = $feed->call( DumpJSON => %opt );
 
 =head2 slim
 
@@ -51,7 +51,7 @@ The default list of limited elements is replaced by this value.
 
 =head1 MODULE DEPENDENCIES
 
-L<JSON::Syck> or L<JSON> is required.
+L<XML::FeedPP>, L<XML::TreePP> and L<JSON::Syck>
 
 =head1 SEE ALSO
 
@@ -77,8 +77,9 @@ use vars qw( @ISA );
 use Carp;
 use Symbol;
 require 5.008;
+use JSON::Syck;
 # use JSON::PP;
-# use JSON::Syck;
+# use JSON::XS;
 
 use vars qw( $VERSION );
 $VERSION = "0.33";
@@ -89,6 +90,13 @@ my $SLIM_ELEM = [qw(
     link title pubDate dc:date modified issued dc:subject category 
     image/url media:content@url media:thumbnail@url
 )];
+my $DEFAULT_OPTS = {
+    slim_element    =>  undef,
+    slim_element_add => undef,
+    utf8_flag       =>  undef,
+    use_json_syck   =>  1,
+    use_json_pp     =>  undef,
+};
 
 sub run {
     my $class = shift;
@@ -97,18 +105,22 @@ sub run {
 }
 
 sub to_json {
-    my $feed = shift;
-    my $file = shift;
-    my $opt  = {@_};
-    my $data = $feed;
+    my $data = shift;
+    my $file = shift if scalar @_ % 2;   # odd arguments
+    my $opts = { %$DEFAULT_OPTS, @_ };
+    $file = $opts->{file} if exists $opts->{file};
 
-    if ( $opt->{slim} || $opt->{slim_element} || $opt->{slim_element_add} ) {
-        $data = &slim_feed( $data, $opt->{slim_element}, $opt->{slim_element_add} );
+    # cut some elements out
+    if ( $opts->{slim} || $opts->{slim_element} || $opts->{slim_element_add} ) {
+        $data = &slim_feed( $data, $opts->{slim_element}, $opts->{slim_element_add} );
     }
 
-    my $json = &dump_json( $data );
+    # perl object to json
+    my $json = &dump_json( $data, $opts );
+
+    # json to file
     if ( $file ) {
-        &write_file( $file, $json );
+        &write_file( $file, $json, $opts );
     }
     $json;
 }
@@ -123,44 +135,84 @@ sub write_file {
 
 sub dump_json {
     my $data = shift;
-    return &dump_json_syck($data) if defined $JSON::Syck::VERSION;
-    return &dump_json_pp($data) if defined $JSON::VERSION;
-    local $@;
-    eval { require JSON::Syck; };
-    return &dump_json_syck($data) if defined $JSON::Syck::VERSION;
-    eval { require JSON; };
-    return &dump_json_pp($data) if defined $JSON::VERSION;
-    Carp::croak "JSON:PP or JSON::Syck is required";
+    my $opts = shift;
+
+    my $usesyck = $opts->{use_json_syck};
+    my $usepp   = $opts->{use_json_pp};
+    $usesyck = 1 unless $usepp;
+    $usepp   = 1 unless $usesyck;
+
+    if ( $usesyck && defined $JSON::Syck::VERSION ) {
+        return &dump_json_syck($data,$opts);
+    }
+    if ( $usepp && defined $JSON::VERSION ) {
+        return &dump_json_pm($data,$opts);
+    }
+    if ( $usesyck ) {
+        local $@;
+        eval { require JSON::Syck; };
+        return &dump_json_syck($data,$opts) unless $@;
+    }
+    if ( $usepp ) {
+        local $@;
+        eval { require JSON; };
+        return &dump_json_pm($data,$opts) unless $@;
+    }
+    if ( $usepp ) {
+        Carp::croak "JSON::PP or JSON::Syck is required";
+    }
+    else {
+        Carp::croak "JSON::Syck is required";
+    }
 }
 
 sub dump_json_syck {
     my $data = shift;
-#   warn "[JSON::Syck $JSON::Syck::VERSION]\n";
-	local $JSON::Syck::ImplicitUnicode = $XML::FeedPP::UTF8_FLAG;
+    my $opts = shift;
+    # warn "[JSON::Syck $JSON::Syck::VERSION]\n";
+    local $JSON::Syck::ImplicitUnicode = $opts->{utf8_flag} if exists $opts->{utf8_flag};
+#   local $JSON::Syck::SingleQuote = 0;
     JSON::Syck::Dump($data);
 }
 
-sub dump_json_pp {
+sub dump_json_pm {
     my $data = shift;
+    my $opts = shift;
+
     my $ver = ( $JSON::VERSION =~ /^([\d\.]+)/ )[0];
-    Carp::croak "JSON::PP version 2.0 or above is required" if ( $ver < 1.99 );
+    Carp::croak "JSON::PP is not correctly loaded." unless $ver;
+    return &dump_json_pp1($data,$opts) if ( $ver < 1.99 );
+    return &dump_json_pp2($data,$opts);
+}
+
+sub dump_json_pp2 {
+    my $data = shift;
+    my $opts = shift;
     if ( ! defined $JSON::PP::VERSION ) {
         local $@;
         eval { require JSON::PP; };
         Carp::croak "JSON::PP is required" if $@;
     }
+    # warn "[JSON::PP $JSON::PP::VERSION]\n";
     my $json = JSON::PP->new();
-    $json->utf8(! $XML::FeedPP::UTF8_FLAG);
-    $json->allow_nonref();
+    my $utf8 = $opts->{utf8_flag} if exists $opts->{utf8_flag};
+    my $bool = $utf8 ? 0 : 1;
+    $json->utf8($bool);
     $json->allow_blessed(1);
     $json->as_nonblessed(1);
-    return $json->encode($data);
+    $json->encode($data);
 }
 
-# sub dump_json_pp_old {
-#     my $opt = { convblessed => 1 };
-#     return JSON->new()->objToJson($data,$opt)
-# }
+sub dump_json_pp1 {
+    my $data = shift;
+    my $opts = shift;
+    # warn "[JSON $JSON::VERSION]\n";
+    my $json = JSON->new();
+    my $utf8 = $opts->{utf8_flag} if exists $opts->{utf8_flag};
+    local $JSON::UTF8 = $utf8 ? 0 : 1;
+    $json->convblessed(1);
+    $json->objToJson($data)
+}
 
 sub slim_feed {
     my $feed = shift;

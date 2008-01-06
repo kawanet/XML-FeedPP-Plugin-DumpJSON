@@ -1,12 +1,13 @@
 # ----------------------------------------------------------------
     use strict;
-    use Test::More tests => 17;
-    BEGIN { use_ok('XML::FeedPP') };
+    use Test::More;
 # ----------------------------------------------------------------
-SKIP: {
+{
     local $@;
     eval { require JSON::Syck; };
-    skip( "JSON::Syck is not loaded.", 16 ) if $@;
+    plan skip_all => 'JSON::Syck is not loaded.' if $@;
+    plan tests => 17;
+    use_ok('XML::FeedPP');
     ok( defined $JSON::Syck::VERSION, "JSON::Syck $JSON::Syck::VERSION" );
     &test_main();
 }
@@ -30,6 +31,8 @@ sub test_main {
         [ 'feed'    =>  XML::FeedPP::Atom->new() ],
     ];
 
+	my $opts = { use_json_syck => 1, use_json_pp => 0 };
+
     foreach my $pair ( @$feeds ) {
         my( $root, $feed ) = @$pair;
         $feed->title( $ftitle );
@@ -45,7 +48,7 @@ sub test_main {
         my $item2 = $feed->add_item( $link2 );
         $item2->title( $title2 );
 
-        my $json = $feed->call( 'DumpJSON' );
+        my $json = $feed->call( DumpJSON => %$opts );
         like( $json, qr/\Q$flink\E/, 'channel link' );
         like( $json, qr/\Q$link1\E/, 'item link 1' );
         like( $json, qr/\Q$link2\E/, 'item link 2' );
