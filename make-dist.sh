@@ -9,17 +9,17 @@ doit () {
     $* || die "[ERROR:$?]"
 }
 
-rdfe=t/example/index-e.rdf
-doit wget -O $rdfe~ http://www.kawa.net/rss/index-e.rdf
-[ -f $rdfe ] || touch $rdfe
-diff $rdfe $rdfe~ > /dev/null || doit /bin/mv -f $rdfe~ $rdfe
-/bin/rm -f $rdfe~
-
-rdfj=t/example/index-j.rdf
-doit wget -O $rdfj~ http://www.kawa.net/index.rdf
-[ -f $rdfj ] || touch $rdfj
-diff $rdfj $rdfj~ > /dev/null || doit /bin/mv -f $rdfj~ $rdfj
-/bin/rm -f $rdfj~
+# rdfe=t/example/index-e.rdf
+# doit wget -O $rdfe~ http://www.kawa.net/rss/index-e.rdf
+# [ -f $rdfe ] || touch $rdfe
+# diff $rdfe $rdfe~ > /dev/null || doit /bin/mv -f $rdfe~ $rdfe
+# /bin/rm -f $rdfe~
+# 
+# rdfj=t/example/index-j.rdf
+# doit wget -O $rdfj~ http://www.kawa.net/index.rdf
+# [ -f $rdfj ] || touch $rdfj
+# diff $rdfj $rdfj~ > /dev/null || doit /bin/mv -f $rdfj~ $rdfj
+# /bin/rm -f $rdfj~
 
 egrep -v '^t/.*\.t$' MANIFEST > MANIFEST~
 ls -t t/*.t | sort >> MANIFEST~

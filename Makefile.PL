@@ -9,8 +9,8 @@ my $opt = {
         'Test::More'        => '0',
         'XML::TreePP'       => '0.33',
         'XML::FeedPP'       => '0.33',
-        'JSON'              => '2.0',
-#       'JSON::Syck'        => '0',
+#       'JSON'              => '2.0',
+        'JSON::Syck'        => '0',
     },
 };
 

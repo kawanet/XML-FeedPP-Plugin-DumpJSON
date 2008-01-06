@@ -7,6 +7,7 @@ META.yml
 README
 t/example/index-e.rdf
 t/example/index-j.rdf
+t/00_pod.t
 t/40_dumpjson_pp.t
 t/41_dumpjson_syck.t
 t/42_slim_pp.t
